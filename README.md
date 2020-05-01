@@ -4,5 +4,6 @@
 + miniz
 + miniLZO
 + LZ4
++ lzma
 + xz
 
