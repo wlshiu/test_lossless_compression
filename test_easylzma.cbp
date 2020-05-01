@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="test_easylzma" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/test_easylzma" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option parameters="good-1-x86-lzma2.xz dec_out.txt" />
+				<Compiler>
+					<Add option="-g" />
+					<Add directory="../test_lossless_compression" />
+					<Add directory="easylzma/include" />
+					<Add directory="easylzma" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/test_easylzma" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Unit filename="easylzma/common_internal.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/common_internal.h" />
+		<Unit filename="easylzma/compress.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/decompress.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/include/easylzma/common.h" />
+		<Unit filename="easylzma/include/easylzma/compress.h" />
+		<Unit filename="easylzma/include/easylzma/decompress.h" />
+		<Unit filename="easylzma/lzip_header.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/lzip_header.h" />
+		<Unit filename="easylzma/lzma_header.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/lzma_header.h" />
+		<Unit filename="easylzma/pavlov/7zBuf.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/7zBuf.h" />
+		<Unit filename="easylzma/pavlov/7zBuf2.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/7zCrc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/7zCrc.h" />
+		<Unit filename="easylzma/pavlov/7zFile.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/7zFile.h" />
+		<Unit filename="easylzma/pavlov/7zStream.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/7zVersion.h" />
+		<Unit filename="easylzma/pavlov/Alloc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/Alloc.h" />
+		<Unit filename="easylzma/pavlov/Bcj2.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/Bcj2.h" />
+		<Unit filename="easylzma/pavlov/Bra.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/Bra.h" />
+		<Unit filename="easylzma/pavlov/Bra86.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/BraIA64.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/CpuArch.h" />
+		<Unit filename="easylzma/pavlov/LzFind.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/LzFind.h" />
+		<Unit filename="easylzma/pavlov/LzHash.h" />
+		<Unit filename="easylzma/pavlov/LzmaDec.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/LzmaDec.h" />
+		<Unit filename="easylzma/pavlov/LzmaEnc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/LzmaEnc.h" />
+		<Unit filename="easylzma/pavlov/LzmaLib.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="easylzma/pavlov/LzmaLib.h" />
+		<Unit filename="easylzma/pavlov/Types.h" />
+		<Unit filename="main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="simple.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="simple.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
