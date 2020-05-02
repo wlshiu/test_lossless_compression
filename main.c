@@ -23,33 +23,40 @@
 #define LZMA_ERROR_PROGRESS         10
 #define LZMA_ERROR_FAIL             11
 #define LZMA_ERROR_THREAD           12
+#define LZMA_ERROR_NO_OPERATOR      13
 #define LZMA_ERROR_ARCHIVE          16
 #define LZMA_ERROR_NO_ARCHIVE       17
 
 typedef int LZMA_ret;
 
-
-typedef struct
+/**
+ *  lzma resource operator
+ */
+typedef struct lzma_opr
 {
-    void *(*Alloc)(void *p, size_t size);
-    void (*Free)(void *p, void *address);   /* address can be 0 */
-} lzma_alloc_t;
+    ISzAlloc    mem_opr;
+
+    int     (*Read)(void *dest, void *src, int length, struct lzma_opr *pLzma_opr);
+    int     (*Write)(void *dest, void *src, int length, struct lzma_opr *pLzma_opr);
+
+    int     (*Report_data_size)(uint32_t unpack_size, struct lzma_opr *pLzma_opr);
+
+    void    *pExtra;
+
+} lzma_opr_t;
 
 
 #define MIN(a,b)                ((a)<(b)?(a):(b))
 #define log_msg(str, ...)       printf("[%s:%d] " str, __func__, __LINE__, ## __VA_ARGS__)
 
-static uint8_t          g_out_buf[CONFIG_MAX_SIZE] = {0};
-static uint64_t         g_unpack_size = 0;
-static FILE             *g_fout = 0;
-
 static SRes
-_Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_size, ISzAlloc *alloc)
+_Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_size, lzma_opr_t *pLzma_opr)
 {
     SRes    res = 0;
 
     do {
         int         has_remained = (unpack_size != (uint32_t)-1);
+        ISzAlloc    *pHAlloc = 0;
         uint8_t     *inBuf = 0;
         uint8_t     *outBuf = 0;
         size_t      inPos = 0, inSize = 0, outPos = 0;
@@ -57,24 +64,21 @@ _Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_si
         uint8_t     *pCur_rd = src;
         uint8_t     *pCur_wr = des;
 
-        if( !(inBuf = (uint8_t*)alloc->Alloc(alloc, CONFIG_IN_BUF_SIZE)) )
+        pHAlloc = &pLzma_opr->mem_opr;
+
+        if( !(inBuf = (uint8_t*)pHAlloc->Alloc(pHAlloc, CONFIG_IN_BUF_SIZE)) )
         {
             log_msg("inbuf malloc failed !\n");
             res =  LZMA_ERROR_MEM;
             break;
         }
 
-        if( !(outBuf = (uint8_t*)alloc->Alloc(alloc, CONFIG_OUT_BUF_SIZE)) )
+        if( !(outBuf = (uint8_t*)pHAlloc->Alloc(pHAlloc, CONFIG_OUT_BUF_SIZE)) )
         {
             log_msg("outbuf malloc failed !\n");
             res = LZMA_ERROR_MEM;
             break;
         }
-
-//        if( !g_fout )
-//        {
-//            g_fout = fopen("tmp_out.bin", "wb");
-//        }
 
         LzmaDec_Init(pHLzma_dec);
 
@@ -91,7 +95,8 @@ _Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_si
                 log_msg("LZMA_read_data, addr = %p \n", pCur_rd);
 
                 // partial decompressing
-                memcpy(inBuf, pCur_rd, inSize);
+                if( pLzma_opr->Read )
+                    pLzma_opr->Read(inBuf, pCur_rd, inSize, pLzma_opr);
 
                 pCur_rd += inSize;
                 inPos = 0;
@@ -120,10 +125,9 @@ _Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_si
             unpack_size -= outProcessed;
 
             // partial move to outside
-//            if( g_fout )
-//                fwrite(outBuf, 1, outPos, g_fout);
+            if( pLzma_opr->Write )
+                pLzma_opr->Write(pCur_wr, outBuf, outPos, pLzma_opr);
 
-            memcpy(pCur_wr, outBuf, outPos);
             pCur_wr += outPos;
             outPos = 0;
 
@@ -131,21 +135,19 @@ _Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_si
             // decompress fail
             if( res != SZ_OK || (has_remained && unpack_size == 0) )
             {
-                alloc->Free(alloc, inBuf);
-                alloc->Free(alloc, outBuf);
+                pHAlloc->Free(pHAlloc, inBuf);
+                pHAlloc->Free(pHAlloc, outBuf);
                 break;;
             }
 
             if( inProcessed == 0 && outProcessed == 0 )
             {
-                alloc->Free(alloc, inBuf);
-                alloc->Free(alloc, outBuf);
+                pHAlloc->Free(pHAlloc, inBuf);
+                pHAlloc->Free(pHAlloc, outBuf);
 
                 if( has_remained || status != LZMA_STATUS_FINISHED_WITH_MARK )
                     res = SZ_ERROR_DATA;
 
-//                if( g_fout )
-//                    fclose(g_fout);
                 break;
             }
 
@@ -153,8 +155,8 @@ _Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_si
             // finish
             if( unpack_size == 0 )
             {
-                alloc->Free(alloc, inBuf);
-                alloc->Free(alloc, outBuf);
+                pHAlloc->Free(pHAlloc, inBuf);
+                pHAlloc->Free(pHAlloc, outBuf);
                 res = LZMA_OK;
                 break;
             }
@@ -164,45 +166,59 @@ _Decode2Ram(CLzmaDec *pHLzma_dec, uint8_t *des, uint8_t *src, uint32_t unpack_si
     return res;
 }
 
-/*
-    lzma_decode to flash, use for decode from flash to flash
-    --------------
-    In:
 
-        destination                 - the destination address on flash for output data
-        reserved_size               - the reserved size for decompressed data
-        source                      - the source address on flash of compressed input data
-        lzma_alloc                  - the allocator for memory allocate and free
-
-    Returns:
-        SZ_OK                       - OK
-        SZ_ERROR_DATA               - Data error
-        SZ_ERROR_MEM                - Memory allocation arror
-        SZ_ERROR_UNSUPPORTED        - Unsupported properties
-        SZ_ERROR_INPUT_EOF          - it needs more bytes in input buffer (src)
-*/
+/**
+ *  @brief  lzma_decode2flash()
+ *
+ *  @param [in] destination         - the destination address
+ *  @param [in] reserved_size       - the reserved size for decompressed data, set '-1' to ignore output size and destination address
+ *  @param [in] source              - the source address on flash of compressed input data
+ *  @param [in] pLzma_opr           - the operator for LZMA
+ *  @return
+ *      SZ_OK                       - OK
+ *      SZ_ERROR_DATA               - Data error
+ *      SZ_ERROR_MEM                - Memory allocation arror
+ *      SZ_ERROR_UNSUPPORTED        - Unsupported properties
+ *      SZ_ERROR_INPUT_EOF          - it needs more bytes in input buffer (src)*
+ *
+ */
 static LZMA_ret
 lzma_decode2flash(
     uint8_t         *destination,
     uint32_t        reserved_size,
     const uint8_t   *source,
-    lzma_alloc_t    *lzma_alloc)
+    lzma_opr_t      *pLzma_opr)
 {
     SRes        res = 0;
     do {
+        uint64_t    unpack_size = 0l;
         uint8_t     lzma_header[LZMA_PROPS_SIZE + 8];
-        ISzAlloc    *pHAlloc = (ISzAlloc*)lzma_alloc;
         CLzmaDec    hLzma_dec;
 
+        if( !pLzma_opr->Read || !pLzma_opr->Write ||
+            !pLzma_opr->mem_opr.Alloc ||
+            !pLzma_opr->mem_opr.Free )
+        {
+            res = LZMA_ERROR_NO_OPERATOR;
+            break;
+        }
+
         // TODO: check alignment of destination
+        if( pLzma_opr->Read )
+            pLzma_opr->Read((void*)lzma_header, (void*)source, sizeof(lzma_header), pLzma_opr);
 
-        memcpy(&lzma_header, source, sizeof(lzma_header));
-
-        g_unpack_size = 0;
+        unpack_size = 0l;
         for(int i = 0; i < 8; i++)
-            g_unpack_size += (uint64_t)lzma_header[LZMA_PROPS_SIZE + i] << (i * 8);
+            unpack_size += (uint64_t)lzma_header[LZMA_PROPS_SIZE + i] << (i * 8);
 
-        if( (uint32_t)g_unpack_size != (-1) && g_unpack_size > reserved_size )
+        if( pLzma_opr->Report_data_size )
+        {
+            int     rval = 0;
+            rval = pLzma_opr->Report_data_size(unpack_size, pLzma_opr);
+            if( rval ) break;
+        }
+
+        if( (uint32_t)unpack_size != (-1) && unpack_size > reserved_size )
         {
             log_msg("decompressed size over reserved size !!!\n");
             res = LZMA_ERROR_MEM;
@@ -210,11 +226,11 @@ lzma_decode2flash(
         }
 
         LzmaDec_Construct(&hLzma_dec);
-        LzmaDec_Allocate(&hLzma_dec, lzma_header, LZMA_PROPS_SIZE, pHAlloc);
+        LzmaDec_Allocate(&hLzma_dec, lzma_header, LZMA_PROPS_SIZE, &pLzma_opr->mem_opr);
 
-        res = _Decode2Ram(&hLzma_dec, destination, (uint8_t*)source + sizeof(lzma_header), g_unpack_size, pHAlloc);
+        res = _Decode2Ram(&hLzma_dec, destination, (uint8_t*)source + sizeof(lzma_header), unpack_size, pLzma_opr);
 
-        LzmaDec_Free(&hLzma_dec, pHAlloc);
+        LzmaDec_Free(&hLzma_dec, &pLzma_opr->mem_opr);
     } while(0);
 
     return res;
@@ -235,6 +251,31 @@ _free(void *p, void *address)
 {
     log_msg("free (%p)\n", address);
     return;
+}
+
+static int
+_read(void *dest, void *src, int length, lzma_opr_t *pLzma_opr)
+{
+    int     act_len = 0;
+    memcpy(dest, src, length);
+    return act_len;
+}
+
+static int
+_write(void *dest, void *src, int length, lzma_opr_t *pLzma_opr)
+{
+    FILE    *fout = *((FILE**)pLzma_opr->pExtra);
+    int     act_len = 0;
+
+    act_len = fwrite(src, 1, length, fout);
+    return act_len;
+}
+
+static int
+_report_data_size(uint32_t unpack_size, lzma_opr_t *pLzma_opr)
+{
+    log_msg("the output size = %d\n", (uint32_t)unpack_size);
+    return 0;
 }
 
 static void
@@ -289,26 +330,23 @@ int main(int argc, char **argv)
         //---------------------------
         {   // action
             int             ret = 0;
-            lzma_alloc_t    hAlloc = { _alloc, _free };
+            lzma_opr_t      hLzma_opr =
+            {
+                .mem_opr            = { _alloc, _free },
+                .Read               = _read,
+                .Write              = _write,
+                .Report_data_size   = _report_data_size,
+            };
 
-            ret = lzma_decode2flash(g_out_buf, CONFIG_MAX_SIZE, (const uint8_t*)pIn_buf, &hAlloc);
+            hLzma_opr.pExtra = (void*)&fout;
+
+            ret = lzma_decode2flash(0, -1, (const uint8_t*)pIn_buf, &hLzma_opr);
             if( ret != LZMA_OK)
             {
                 log_msg("lzma decompress status = %d \n", ret);
                 break;
             }
         }
-
-        //-----------------------
-        // handle decompressed data
-        if( !g_unpack_size )
-        {
-            log_msg("lzma decode fail \n");
-            break;
-        }
-
-        log_msg("the output size = %d\n", g_unpack_size);
-        fwrite(g_out_buf, 1, g_unpack_size, fout);
 
     } while(0);
 

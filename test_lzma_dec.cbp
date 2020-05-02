@@ -11,12 +11,19 @@
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="boot0.bin.lzma out.raw" />
+				<Option parameters="boot0.bin.lzma out.bin" />
 				<Compiler>
 					<Add option="-g" />
+					<Add option="-D_LZMA_SIZE_OPT" />
 					<Add directory="../test_lossless_compression" />
 					<Add directory="lzma_dec" />
 				</Compiler>
+				<Linker>
+					<Add option="-Wl,-Map=${TARGET_OUTPUT_FILE}.map" />
+				</Linker>
+				<ExtraCommands>
+					<Add after="size ${TARGET_OUTPUT_FILE}" />
+				</ExtraCommands>
 			</Target>
 			<Target title="Release">
 				<Option output="bin/Release/test_lzma_dec" prefix_auto="1" extension_auto="1" />
